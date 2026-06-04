@@ -63,6 +63,9 @@ dmypy.json
 .DS_Store
 Thumbs.db
 
+# Playwright (screenshots / mcp artifacts)
+.playwright-mcp/
+
 # Secrets
 *.env
 .env.*
