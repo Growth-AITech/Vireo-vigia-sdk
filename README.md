@@ -135,7 +135,7 @@ src/vireo_vigia/
 
 ## Quality
 
-- **200 unit tests** · **17 E2E tests** (real Qdrant + Hyperliquid mainnet)
+- **224 unit tests** · **17 E2E tests** (real Qdrant + Hyperliquid mainnet)
 - **19 Agent E2E tests** using real Anthropic API
 - mypy strict · ruff 0 violations · bandit 0 security issues
 - GitHub Actions CI on every push
