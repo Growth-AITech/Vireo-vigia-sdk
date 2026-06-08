@@ -170,6 +170,79 @@ class TestGetUserPositions:
             assert await reader.get_user_positions("0xUSER") == []
 
 
+class TestGetMarketInfo:
+    """Market data now comes from AaveProtocolDataProvider."""
+
+    async def test_returns_market_fields(self) -> None:
+        reader = AaveV3Reader()
+        tokens = [("USDC", "0xUSDC")]
+        # getReserveData: [unbacked, accruedToTreasury, totalAToken, totalStableDebt,
+        #   totalVariableDebt, liquidityRate, variableBorrowRate, stableBorrowRate, ...]
+        reserve_data = (
+            0,
+            0,
+            1_000_000 * 10**6,  # totalAToken (1M USDC supplied)
+            0,  # totalStableDebt
+            800_000 * 10**6,  # totalVariableDebt
+            int(0.024 * _RAY),  # liquidityRate
+            int(0.083 * _RAY),  # variableBorrowRate
+            0,  # stableBorrowRate
+            0,
+            0,
+            0,
+            0,
+        )
+        # getReserveConfigurationData: [decimals, ltv, liqThreshold, ...]
+        cfg = (6, 7700, 8000, 10500, 1000, True, True, False, True, False)
+
+        pdp = MagicMock()
+        pdp.functions.getAllReservesTokens.return_value.call = AsyncMock(return_value=tokens)
+        pdp.functions.getReserveData.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=reserve_data)
+        )
+        pdp.functions.getReserveConfigurationData.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=cfg)
+        )
+        oracle = MagicMock()
+        oracle.functions.getAssetPrice.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=int(1.0 * _BASE_CURRENCY_UNIT))
+        )
+        w3 = MagicMock()
+        w3.to_checksum_address = lambda x: x
+        w3.eth.contract.return_value = oracle
+
+        with (
+            patch.object(reader, "_get_w3", return_value=w3),
+            patch.object(reader, "_pdp_contract", AsyncMock(return_value=pdp)),
+            patch.object(reader, "_decimals", AsyncMock(return_value=6)),
+        ):
+            market = await reader.get_market_info("usdc")
+
+        assert market["asset_symbol"] == "USDC"
+        assert market["ltv"] == pytest.approx(0.77)
+        assert market["liquidation_threshold"] == pytest.approx(0.80)
+        assert 0.02 < market["variable_borrow_apy"] < 0.10
+        assert market["utilization_rate"] == pytest.approx(0.8, abs=0.01)
+
+    async def test_unknown_asset_raises(self) -> None:
+        from vireo_vigia.exceptions import ChainDataError
+
+        reader = AaveV3Reader()
+        pdp = MagicMock()
+        pdp.functions.getAllReservesTokens.return_value.call = AsyncMock(
+            return_value=[("USDC", "0xUSDC")]
+        )
+        w3 = MagicMock()
+        w3.to_checksum_address = lambda x: x
+
+        with (
+            patch.object(reader, "_get_w3", return_value=w3),
+            patch.object(reader, "_pdp_contract", AsyncMock(return_value=pdp)),
+        ):
+            with pytest.raises(ChainDataError):
+                await reader.get_market_info("DOGE")
+
+
 class TestGetRecentTrades:
     async def test_returns_empty_list(self) -> None:
         reader = AaveV3Reader()

@@ -8,6 +8,7 @@ Only the static section is eligible for Anthropic prompt caching.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from vireo_vigia.agent.models import AgentConfig
@@ -116,7 +117,7 @@ def format_chain_context(
     return _format_perp_context(balance, positions)
 
 
-def _money(value: Any) -> str:
+def _money(value: Any) -> str:  # noqa: ANN401 — accepts float|str from reader dicts
     """Format a USD amount, falling back to the raw value if non-numeric."""
     try:
         return f"${float(value):,.2f}"
@@ -155,13 +156,11 @@ def _format_lending_context(
     ltv = balance.get("current_ltv")
     liq_thr = balance.get("liquidation_threshold")
     if ltv is not None and liq_thr is not None:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             lines.append(
                 f"- LTV: {float(ltv) * 100:.0f}% | "
                 f"Liquidation threshold: {float(liq_thr) * 100:.0f}%"
             )
-        except (TypeError, ValueError):
-            pass
 
     if positions:
         lines.append("\n**Positions:**")

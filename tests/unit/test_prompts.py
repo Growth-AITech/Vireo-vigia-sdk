@@ -93,3 +93,82 @@ class TestFormatChainContext:
     def test_accepts_alternative_key_names(self) -> None:
         result = format_chain_context({"accountValue": "9999"}, [])
         assert "9999" in result
+
+
+_AAVE_BALANCE = {
+    "total_collateral_usd": 137891.84,
+    "total_debt_usd": 91041.08,
+    "available_borrow_usd": 12377.80,
+    "current_ltv": 0.75,
+    "liquidation_threshold": 0.78,
+    "health_factor": 1.18,
+}
+_AAVE_POSITIONS = [
+    {
+        "asset_symbol": "USDC",
+        "position_type": "supply",
+        "balance_usd": 137891.84,
+        "apy": 0.024,
+        "is_collateral": True,
+    },
+    {
+        "asset_symbol": "WBTC",
+        "position_type": "borrow",
+        "balance_usd": 91041.08,
+        "apy": 0.0098,
+        "is_collateral": False,
+    },
+]
+
+
+class TestFormatChainContextLending:
+    """Aave-style (lending) on-chain context formatting."""
+
+    def test_detects_lending_schema(self) -> None:
+        result = format_chain_context(_AAVE_BALANCE, _AAVE_POSITIONS)
+        # Should NOT fall back to the perp "Account value" formatting.
+        assert "Account value" not in result
+        assert "Total collateral" in result
+        assert "Total debt" in result
+
+    def test_includes_usd_amounts_and_health_factor(self) -> None:
+        result = format_chain_context(_AAVE_BALANCE, _AAVE_POSITIONS)
+        assert "$137,891.84" in result
+        assert "$91,041.08" in result
+        assert "1.18" in result
+        assert "LTV: 75%" in result
+        assert "78%" in result
+
+    def test_low_health_factor_warns(self) -> None:
+        result = format_chain_context({**_AAVE_BALANCE, "health_factor": 1.18}, [])
+        assert "elevated liquidation risk" in result
+
+    def test_critical_health_factor(self) -> None:
+        result = format_chain_context({**_AAVE_BALANCE, "health_factor": 0.95}, [])
+        assert "LIQUIDATION IMMINENT" in result
+
+    def test_healthy_health_factor(self) -> None:
+        result = format_chain_context({**_AAVE_BALANCE, "health_factor": 2.1}, [])
+        assert "healthy" in result
+
+    def test_positions_rendered_with_apy_and_collateral(self) -> None:
+        result = format_chain_context(_AAVE_BALANCE, _AAVE_POSITIONS)
+        assert "SUPPLY USDC" in result
+        assert "BORROW WBTC" in result
+        assert "collateral" in result
+        assert "APY" in result
+
+    def test_no_positions_placeholder(self) -> None:
+        result = format_chain_context(_AAVE_BALANCE, [])
+        assert "No open positions" in result
+
+    def test_lending_detected_from_positions_only(self) -> None:
+        # Even with an empty balance, position keys flag the lending schema.
+        result = format_chain_context({}, [{"asset_symbol": "ARB", "position_type": "supply"}])
+        assert "SUPPLY ARB" in result
+
+    def test_non_numeric_amount_falls_back(self) -> None:
+        result = format_chain_context(
+            {"total_collateral_usd": "N/A", "health_factor": "n/a"}, []
+        )
+        assert "$N/A" in result
