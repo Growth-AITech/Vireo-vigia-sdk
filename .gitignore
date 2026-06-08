@@ -66,6 +66,9 @@ Thumbs.db
 # Playwright (screenshots / mcp artifacts)
 .playwright-mcp/
 
+# Claude Code (personal local config — keep shared commands/settings tracked)
+.claude/settings.local.json
+
 # Secrets
 *.env
 .env.*
