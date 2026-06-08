@@ -15,9 +15,9 @@ from vireo_vigia.exceptions import (
     IngestError,
     KnowledgeBaseError,
     LLMError,
-    VireoVigiaError,
     RateLimitError,
     VectorStoreError,
+    VireoVigiaError,
 )
 
 

@@ -69,6 +69,7 @@ async def main() -> None:
 
     # Pre-flight validation — catch config errors before starting the bot
     from rich.console import Console as _Console
+
     _con = _Console()
     _con.print("[cyan]Starting Vireo Vigía Discord bot...[/cyan]")
 

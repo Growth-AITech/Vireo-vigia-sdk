@@ -23,7 +23,9 @@ def _make_chain(funding_rate: float = 0.0001, price: float = 65000.0) -> AsyncMo
     chain = AsyncMock()
     chain.get_market_info = AsyncMock(return_value={"mark_price": price, "open_interest": 1e9})
     chain.get_funding_rate = AsyncMock(return_value={"rate": funding_rate})
-    chain.get_user_balance = AsyncMock(return_value={"health_factor": 2.0, "account_value": 10000.0})
+    chain.get_user_balance = AsyncMock(
+        return_value={"health_factor": 2.0, "account_value": 10000.0}
+    )
     chain.get_user_positions = AsyncMock(return_value=[])
     return chain
 
@@ -36,13 +38,15 @@ class TestAlertEngineStress:
         engine = AlertEngine(chain_reader=chain, poll_interval=999)
 
         for i in range(50):
-            engine.add(AlertCondition(
-                asset="BTC" if i % 2 == 0 else "ETH",
-                metric="price",
-                operator="above",
-                threshold=0.0,  # always fires
-                user_id=f"user_{i}",
-            ))
+            engine.add(
+                AlertCondition(
+                    asset="BTC" if i % 2 == 0 else "ETH",
+                    metric="price",
+                    operator="above",
+                    threshold=0.0,  # always fires
+                    user_id=f"user_{i}",
+                )
+            )
 
         t0 = time.monotonic()
         events = await engine.check_once()
@@ -51,7 +55,7 @@ class TestAlertEngineStress:
         assert len(events) == 50
         # 50 mocked calls should complete well under 2 seconds
         assert elapsed < 2.0, f"50 conditions took {elapsed:.2f}s"
-        print(f"\n  50 alert conditions: {elapsed*1000:.0f}ms")
+        print(f"\n  50 alert conditions: {elapsed * 1000:.0f}ms")
 
     async def test_concurrent_engines(self) -> None:
         """10 independent AlertEngines running check_once() concurrently."""
@@ -59,10 +63,15 @@ class TestAlertEngineStress:
         for i in range(10):
             chain = _make_chain(price=float(50000 + i * 1000))
             engine = AlertEngine(chain_reader=chain, poll_interval=999)
-            engine.add(AlertCondition(
-                asset="BTC", metric="price", operator="above",
-                threshold=0.0, user_id=f"user_{i}",
-            ))
+            engine.add(
+                AlertCondition(
+                    asset="BTC",
+                    metric="price",
+                    operator="above",
+                    threshold=0.0,
+                    user_id=f"user_{i}",
+                )
+            )
             engines.append(engine)
 
         t0 = time.monotonic()
@@ -72,7 +81,7 @@ class TestAlertEngineStress:
         assert len(results) == 10
         assert all(len(r) == 1 for r in results)
         assert elapsed < 2.0, f"10 concurrent engines took {elapsed:.2f}s"
-        print(f"\n  10 concurrent alert engines: {elapsed*1000:.0f}ms")
+        print(f"\n  10 concurrent alert engines: {elapsed * 1000:.0f}ms")
 
     async def test_dedup_prevents_alert_flood(self) -> None:
         """above/below operators fire on every cycle where condition is true."""
@@ -83,11 +92,15 @@ class TestAlertEngineStress:
             fired.append(e)
 
         engine = AlertEngine(chain_reader=chain, on_alert=on_alert, poll_interval=999)
-        engine.add(AlertCondition(
-            asset="BTC", metric="price", operator="below",
-            threshold=60000.0,  # 55K < 60K → fires
-            user_id="user1",
-        ))
+        engine.add(
+            AlertCondition(
+                asset="BTC",
+                metric="price",
+                operator="below",
+                threshold=60000.0,  # 55K < 60K → fires
+                user_id="user1",
+            )
+        )
 
         # Run 5 cycles
         for _ in range(5):
@@ -117,11 +130,15 @@ class TestAlertEngineStress:
             fired.append(e)
 
         engine = AlertEngine(chain_reader=chain, on_alert=on_alert, poll_interval=999)
-        engine.add(AlertCondition(
-            asset="BTC", metric="price", operator="crosses_above",
-            threshold=60000.0,  # only fires when crossing from below to above
-            user_id="user1",
-        ))
+        engine.add(
+            AlertCondition(
+                asset="BTC",
+                metric="price",
+                operator="crosses_above",
+                threshold=60000.0,  # only fires when crossing from below to above
+                user_id="user1",
+            )
+        )
 
         for _ in range(5):
             await engine.check_once()
@@ -135,10 +152,17 @@ class TestWhaleTrackerStress:
     async def test_10_wallets_concurrent(self) -> None:
         """Scan 10 wallets concurrently for whale movements."""
         chain = AsyncMock()
-        chain.get_user_positions = AsyncMock(return_value=[{
-            "asset": "BTC", "size": 15.0, "mark_price": 65000.0,
-            "size_usd": 975_000.0, "unrealized_pnl": 10000.0,
-        }])
+        chain.get_user_positions = AsyncMock(
+            return_value=[
+                {
+                    "asset": "BTC",
+                    "size": 15.0,
+                    "mark_price": 65000.0,
+                    "size_usd": 975_000.0,
+                    "unrealized_pnl": 10000.0,
+                }
+            ]
+        )
 
         tracker = WhaleTracker(chain_reader=chain, min_size_usd=500_000)
         wallets = [f"0x{i:040x}" for i in range(10)]
@@ -150,7 +174,7 @@ class TestWhaleTrackerStress:
         assert len(results) == 10
         assert all(len(r) == 1 for r in results)
         assert elapsed < 2.0, f"10 wallet scans took {elapsed:.2f}s"
-        print(f"\n  10 concurrent whale scans: {elapsed*1000:.0f}ms")
+        print(f"\n  10 concurrent whale scans: {elapsed * 1000:.0f}ms")
 
     async def test_position_change_detection(self) -> None:
         """Tracker correctly detects position size changes across scans."""
@@ -161,10 +185,24 @@ class TestWhaleTrackerStress:
         def get_positions(wallet: str) -> list:  # type: ignore[return]
             call_count[0] += 1
             if call_count[0] == 1:
-                return [{"asset": "ETH", "size": 500.0, "mark_price": 3000.0,
-                         "size_usd": 1_500_000.0, "unrealized_pnl": 0.0}]
-            return [{"asset": "ETH", "size": 700.0, "mark_price": 3000.0,
-                     "size_usd": 2_100_000.0, "unrealized_pnl": 50000.0}]
+                return [
+                    {
+                        "asset": "ETH",
+                        "size": 500.0,
+                        "mark_price": 3000.0,
+                        "size_usd": 1_500_000.0,
+                        "unrealized_pnl": 0.0,
+                    }
+                ]
+            return [
+                {
+                    "asset": "ETH",
+                    "size": 700.0,
+                    "mark_price": 3000.0,
+                    "size_usd": 2_100_000.0,
+                    "unrealized_pnl": 50000.0,
+                }
+            ]
 
         chain.get_user_positions = AsyncMock(side_effect=get_positions)
 
@@ -188,10 +226,14 @@ class TestGovernanceDigestStress:
         from vireo_vigia.llm.models import LLMResponse
 
         llm = AsyncMock()
-        llm.chat = AsyncMock(return_value=LLMResponse(
-            text="This proposal adjusts risk parameters. Impact: moderate. Vote: yes.",
-            model="claude-sonnet-4-5", input_tokens=50, output_tokens=20,
-        ))
+        llm.chat = AsyncMock(
+            return_value=LLMResponse(
+                text="This proposal adjusts risk parameters. Impact: moderate. Vote: yes.",
+                model="claude-sonnet-4-5",
+                input_tokens=50,
+                output_tokens=20,
+            )
+        )
 
         digest = GovernanceDigest(llm=llm, snapshot_spaces=[])
         proposals = [
@@ -215,7 +257,7 @@ class TestGovernanceDigestStress:
         assert all(r.summary for r in results)
         assert all(r.discord_message for r in results)
         assert elapsed < 2.0, f"10 concurrent summaries took {elapsed:.2f}s"
-        print(f"\n  10 concurrent governance summaries: {elapsed*1000:.0f}ms")
+        print(f"\n  10 concurrent governance summaries: {elapsed * 1000:.0f}ms")
 
 
 @pytest.mark.volume
@@ -226,10 +268,14 @@ class TestDigestStress:
 
         chain = _make_chain()
         llm = AsyncMock()
-        llm.chat = AsyncMock(return_value=LLMResponse(
-            text="Portfolio looks stable. No immediate risks.",
-            model="claude-sonnet-4-5", input_tokens=30, output_tokens=10,
-        ))
+        llm.chat = AsyncMock(
+            return_value=LLMResponse(
+                text="Portfolio looks stable. No immediate risks.",
+                model="claude-sonnet-4-5",
+                input_tokens=30,
+                output_tokens=10,
+            )
+        )
 
         wallets = [f"0x{i:040x}" for i in range(5)]
 
@@ -242,26 +288,40 @@ class TestDigestStress:
         elapsed = time.monotonic() - t0
 
         assert elapsed < 3.0, f"5 concurrent digests took {elapsed:.2f}s"
-        print(f"\n  5 concurrent portfolio digests: {elapsed*1000:.0f}ms")
+        print(f"\n  5 concurrent portfolio digests: {elapsed * 1000:.0f}ms")
 
     async def test_digest_markdown_structure(self) -> None:
         """Generated markdown has expected structure."""
         from vireo_vigia.llm.models import LLMResponse
 
         chain = _make_chain()
-        chain.get_user_positions = AsyncMock(return_value=[
-            {"asset": "BTC", "size": 0.5, "mark_price": 65000.0,
-             "unrealized_pnl": 500.0, "funding_since_open": 5.0}
-        ])
-        chain.get_user_balance = AsyncMock(return_value={
-            "account_value": 50000.0, "health_factor": 1.8,
-        })
+        chain.get_user_positions = AsyncMock(
+            return_value=[
+                {
+                    "asset": "BTC",
+                    "size": 0.5,
+                    "mark_price": 65000.0,
+                    "unrealized_pnl": 500.0,
+                    "funding_since_open": 5.0,
+                }
+            ]
+        )
+        chain.get_user_balance = AsyncMock(
+            return_value={
+                "account_value": 50000.0,
+                "health_factor": 1.8,
+            }
+        )
 
         llm = AsyncMock()
-        llm.chat = AsyncMock(return_value=LLMResponse(
-            text="BTC long looks healthy at current levels.",
-            model="claude-sonnet-4-5", input_tokens=25, output_tokens=10,
-        ))
+        llm.chat = AsyncMock(
+            return_value=LLMResponse(
+                text="BTC long looks healthy at current levels.",
+                model="claude-sonnet-4-5",
+                input_tokens=25,
+                output_tokens=10,
+            )
+        )
 
         digest = PortfolioDigest(chain_reader=chain, llm=llm)
         report = await digest.generate("0xtest")

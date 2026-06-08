@@ -93,9 +93,7 @@ def ingest(
             total = await pipeline.ingest([doc])
             p.update(task, description=f"Done — {total} chunks ingested", completed=True)
 
-        console.print(
-            f"\n[green]Done.[/green] '{doc_title}' → {total} chunks in '{collection}'"
-        )
+        console.print(f"\n[green]Done.[/green] '{doc_title}' → {total} chunks in '{collection}'")
 
     asyncio.run(_run())
 
@@ -181,13 +179,15 @@ def chat(
         wallet_display = (
             f"[dim]{wallet[:8]}...{wallet[-4:]}[/dim]" if wallet else "[dim]no wallet[/dim]"
         )
-        console.print(Panel(
-            f"[bold cyan]Vireo Vigía[/bold cyan] · {protocol}\n"
-            f"Wallet: {wallet_display} · Collection: [dim]{collection}[/dim]\n"
-            "[dim]/reset to clear memory · /quit to exit[/dim]",
-            border_style="cyan",
-            padding=(0, 2),
-        ))
+        console.print(
+            Panel(
+                f"[bold cyan]Vireo Vigía[/bold cyan] · {protocol}\n"
+                f"Wallet: {wallet_display} · Collection: [dim]{collection}[/dim]\n"
+                "[dim]/reset to clear memory · /quit to exit[/dim]",
+                border_style="cyan",
+                padding=(0, 2),
+            )
+        )
         console.print()
 
         async with chain_reader:

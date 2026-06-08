@@ -108,8 +108,7 @@ def format_chain_context(
         Formatted markdown string.
     """
     is_lending = any(
-        k in balance
-        for k in ("health_factor", "total_collateral_usd", "total_debt_usd")
+        k in balance for k in ("health_factor", "total_collateral_usd", "total_debt_usd")
     ) or any(("asset_symbol" in p or "position_type" in p) for p in positions)
 
     if is_lending:

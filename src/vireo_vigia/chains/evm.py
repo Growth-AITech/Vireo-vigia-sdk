@@ -261,9 +261,7 @@ class AaveV3Reader:
                 addr = await provider.functions.getPoolDataProvider().call()
             except Exception as exc:  # provider lookup is best-effort
                 _log.debug("aave_pdp_lookup_fallback", error=str(exc)[:120])
-            self._pdp = w3.eth.contract(
-                address=w3.to_checksum_address(addr), abi=_PDP_ABI
-            )
+            self._pdp = w3.eth.contract(address=w3.to_checksum_address(addr), abi=_PDP_ABI)
         return self._pdp
 
     async def _decimals(self, asset: str) -> int:
@@ -271,9 +269,7 @@ class AaveV3Reader:
         key = asset.lower()
         if key not in self._decimals_cache:
             w3 = self._get_w3()
-            erc20 = w3.eth.contract(
-                address=w3.to_checksum_address(asset), abi=_ERC20_ABI
-            )
+            erc20 = w3.eth.contract(address=w3.to_checksum_address(asset), abi=_ERC20_ABI)
             self._decimals_cache[key] = int(await erc20.functions.decimals().call())
         return self._decimals_cache[key]
 
@@ -293,9 +289,7 @@ class AaveV3Reader:
         w3 = self._get_w3()
         try:
             pdp = await self._pdp_contract()
-            oracle = w3.eth.contract(
-                address=w3.to_checksum_address(_AAVE_ORACLE), abi=_ORACLE_ABI
-            )
+            oracle = w3.eth.contract(address=w3.to_checksum_address(_AAVE_ORACLE), abi=_ORACLE_ABI)
             user = w3.to_checksum_address(wallet)
             tokens = await pdp.functions.getAllReservesTokens().call()
 
@@ -360,9 +354,7 @@ class AaveV3Reader:
                 address=w3.to_checksum_address(self._pool_addr),
                 abi=_POOL_ABI,
             )
-            result = await pool.functions.getUserAccountData(
-                w3.to_checksum_address(wallet)
-            ).call()
+            result = await pool.functions.getUserAccountData(w3.to_checksum_address(wallet)).call()
         except Exception as exc:
             raise ChainConnectionError(f"Aave getUserAccountData failed: {exc}") from exc
 
@@ -443,9 +435,7 @@ class AaveV3Reader:
             if symbol.upper() != target:
                 continue
 
-            oracle = w3.eth.contract(
-                address=w3.to_checksum_address(_AAVE_ORACLE), abi=_ORACLE_ABI
-            )
+            oracle = w3.eth.contract(address=w3.to_checksum_address(_AAVE_ORACLE), abi=_ORACLE_ABI)
             decimals = await self._decimals(addr)
             price_usd = (await oracle.functions.getAssetPrice(addr).call()) / _BASE_CURRENCY_UNIT
             unit = 10**decimals

@@ -168,7 +168,5 @@ class TestFormatChainContextLending:
         assert "SUPPLY ARB" in result
 
     def test_non_numeric_amount_falls_back(self) -> None:
-        result = format_chain_context(
-            {"total_collateral_usd": "N/A", "health_factor": "n/a"}, []
-        )
+        result = format_chain_context({"total_collateral_usd": "N/A", "health_factor": "n/a"}, [])
         assert "$N/A" in result

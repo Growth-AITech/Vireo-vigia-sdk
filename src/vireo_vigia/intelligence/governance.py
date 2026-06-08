@@ -44,15 +44,15 @@ class GovernanceProposal:
     body: str
     start: float
     end: float
-    state: str       # "active", "closed", "pending"
+    state: str  # "active", "closed", "pending"
     scores_total: float = 0.0
     quorum: float = 0.0
     url: str = ""
 
     # AI-generated fields
-    summary: str = ""           # 2-3 sentence plain-language summary
-    impact_analysis: str = ""   # how it affects users
-    discord_message: str = ""   # formatted for Discord
+    summary: str = ""  # 2-3 sentence plain-language summary
+    impact_analysis: str = ""  # how it affects users
+    discord_message: str = ""  # formatted for Discord
 
 
 class GovernanceDigest:
@@ -112,7 +112,7 @@ class GovernanceDigest:
             proposal.summary = text
 
             # Build Discord message
-            time_str = f"{hours_left:.0f}h" if hours_left < 48 else f"{hours_left/24:.0f}d"
+            time_str = f"{hours_left:.0f}h" if hours_left < 48 else f"{hours_left / 24:.0f}d"
             proposal.discord_message = (
                 f"📋 **New Governance Proposal** — {proposal.space}\n"
                 f"**{proposal.title}**\n\n"

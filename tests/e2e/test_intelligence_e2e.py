@@ -63,13 +63,15 @@ class TestAlertEngineE2E:
         async with HyperliquidReader() as reader:
             engine = AlertEngine(chain_reader=reader, poll_interval=999)
             for asset in ["BTC", "ETH", "SOL"]:
-                engine.add(AlertCondition(
-                    asset=asset,
-                    metric="funding_rate",
-                    operator="above",
-                    threshold=-999.0,
-                    user_id="e2e_test",
-                ))
+                engine.add(
+                    AlertCondition(
+                        asset=asset,
+                        metric="funding_rate",
+                        operator="above",
+                        threshold=-999.0,
+                        user_id="e2e_test",
+                    )
+                )
 
             t0 = time.monotonic()
             events = await engine.check_once()
@@ -83,13 +85,15 @@ class TestAlertEngineE2E:
         """Single condition check should complete in under 3 seconds."""
         async with HyperliquidReader() as reader:
             engine = AlertEngine(chain_reader=reader, poll_interval=999)
-            engine.add(AlertCondition(
-                asset="BTC",
-                metric="price",
-                operator="above",
-                threshold=0.0,
-                user_id="e2e_test",
-            ))
+            engine.add(
+                AlertCondition(
+                    asset="BTC",
+                    metric="price",
+                    operator="above",
+                    threshold=0.0,
+                    user_id="e2e_test",
+                )
+            )
 
             t0 = time.monotonic()
             await engine.check_once()
@@ -108,9 +112,7 @@ class TestWhaleTrackerE2E:
                 min_size_usd=1_000_000,  # high threshold — probably no alerts
             )
             # Use a known public address (zero address — likely has no positions)
-            alerts = await tracker.scan_wallet(
-                "0x0000000000000000000000000000000000000000"
-            )
+            alerts = await tracker.scan_wallet("0x0000000000000000000000000000000000000000")
         # May or may not have alerts — just shouldn't crash
         assert isinstance(alerts, list)
 
@@ -119,13 +121,17 @@ class TestWhaleTrackerE2E:
         from unittest.mock import AsyncMock
 
         chain = AsyncMock()
-        chain.get_user_positions = AsyncMock(return_value=[{
-            "asset": "BTC",
-            "size": 10.0,
-            "mark_price": 65000.0,
-            "size_usd": 650_000.0,
-            "unrealized_pnl": 5000.0,
-        }])
+        chain.get_user_positions = AsyncMock(
+            return_value=[
+                {
+                    "asset": "BTC",
+                    "size": 10.0,
+                    "mark_price": 65000.0,
+                    "size_usd": 650_000.0,
+                    "unrealized_pnl": 5000.0,
+                }
+            ]
+        )
 
         tracker = WhaleTracker(chain_reader=chain, min_size_usd=500_000)
         alerts = await tracker.scan_wallet("0xtest_wallet")
@@ -223,9 +229,7 @@ class TestPortfolioDigestE2E:
         async with HyperliquidReader() as reader:
             digest = PortfolioDigest(chain_reader=reader, llm=llm)
             # Use test wallet (likely has no positions — graceful empty case)
-            report = await digest.generate(
-                wallet="0x65bf83b7B8B3370bf2Dc59cdF95BfE221d064Fc2"
-            )
+            report = await digest.generate(wallet="0x65bf83b7B8B3370bf2Dc59cdF95BfE221d064Fc2")
 
         assert report.wallet == "0x65bf83b7B8B3370bf2Dc59cdF95BfE221d064Fc2"
         assert "Portfolio Digest" in report.markdown
