@@ -69,6 +69,10 @@ Thumbs.db
 # Claude Code (personal local config — keep shared commands/settings tracked)
 .claude/settings.local.json
 
+# Demo-video tooling (local only — drives the separate vireo-demo-video project)
+demo_capture.json
+examples/video_demo/
+
 # Secrets
 *.env
 .env.*
