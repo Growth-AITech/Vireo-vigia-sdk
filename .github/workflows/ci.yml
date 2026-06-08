@@ -61,11 +61,6 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
-    services:
-      qdrant:
-        image: qdrant/qdrant:latest
-        ports:
-          - 6333:6333
     steps:
       - uses: actions/checkout@v4
 
@@ -82,13 +77,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run tests
+      - name: Run unit tests
+        # PR gate runs the deterministic unit suite. The e2e tests need real,
+        # paid API keys ("run sparingly" per their docstrings) and the
+        # integration tests need live infrastructure — both are opt-in and run
+        # explicitly via `pytest -m e2e` / `-m integration`, not on every PR.
         env:
           VIREO_ANTHROPIC_API_KEY: "test-key"
           VIREO_OPENAI_API_KEY: "test-key"
-          VIREO_QDRANT_URL: "http://localhost:6333"
           VIREO_ENVIRONMENT: "development"
-        run: uv run pytest --cov-fail-under=70
+        run: uv run pytest tests/unit --cov-fail-under=70
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -118,5 +116,9 @@ jobs:
       - name: Bandit security scan
         run: uv run bandit -r src/ -c pyproject.toml
 
-      - name: pip-audit
-        run: uv run pip-audit
+      - name: pip-audit (dependencies)
+        # aiohttp advisories resolved by the lock bump to 3.14.1.
+        # PYSEC-2026-196 is a pip (build-tool) advisory, not a shipped
+        # dependency, so it is ignored here. --skip-editable avoids auditing the
+        # local unpublished package.
+        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2026-196

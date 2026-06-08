@@ -31,11 +31,13 @@ src/vireo_vigia/
 │                 #      ingest.py (SemanticChunker), retriever.py
 ├── chains/       # hyperliquid.py, evm.py (Aave V3 Arbitrum), gmx.py (stub)
 ├── channels/     # discord.py (/ask /positions /health /monitor /help), telegram.py
-├── intelligence/ # health_monitor.py (DM alerts before liquidation), alerts/digest/whale/governance
+├── monitoring/   # health_monitor.py (DM alerts before liquidation)
+├── intelligence/ # alerts.py / digest.py / whale.py / governance.py
 ├── llm/          # anthropic.py (+ retry + caching), base.py (LLMProvider protocol)
 ├── config.py     # Pydantic Settings — ALL env vars prefixed VIREO_
 ├── exceptions.py # VireoVigiaError → LLMError → RateLimitError, ConfigurationError, ...
-└── cli.py        # typer app — entrypoint `vireo-vigia`
+├── logging.py    # structlog setup (configure_logging)
+└── cli.py        # typer app — entrypoint `vireo-vigia` (version / ingest / chat)
 
 examples/   hyperliquid_demo/ (REPL + ingest_docs.py), arbitrum_aave_demo/, discord_demo/bot.py, telegram_demo/bot.py
 tests/      unit/ (211 tests, no external keys) · e2e/ (real Qdrant + HL mainnet) · volume/
@@ -54,13 +56,18 @@ PYTHONUTF8=1 uv run python examples/hyperliquid_demo/ingest_docs.py --collection
 PYTHONUTF8=1 uv run python examples/discord_demo/bot.py   # Discord bot
 uv run pytest tests/unit/ -q                              # 211 tests, no keys needed
 uv run vireo-vigia version                                # CLI entrypoint check
+
+# CLI does ingest + chat too (no demo scripts needed)
+uv run vireo-vigia ingest <url|file.md> --collection <your_collection>
+uv run vireo-vigia chat 0xYOUR_WALLET --collection <your_collection> --protocol Aave
 ```
 On Windows the venv interpreter is `.venv/Scripts/python.exe` (use it directly if `uv run` is slow).
 
 ## Gotchas (learned the hard way)
-- **Ingest collection is hardcoded.** `examples/hyperliquid_demo/ingest_docs.py` defaults to
-  `--collection vireo_docs` and IGNORES `VIREO_QDRANT_COLLECTION`. Always pass `--collection` to
-  match the collection your bot/agent reads (from `.env`), or `/ask` queries an empty collection.
+- **Ingest collection defaults to `vireo_docs` and IGNORES `VIREO_QDRANT_COLLECTION`.** True for both
+  `examples/hyperliquid_demo/ingest_docs.py` AND the `vireo-vigia ingest` CLI command. Always pass
+  `--collection` to match the collection your bot/agent reads (from `.env`), or `/ask` queries an
+  empty collection.
 - **Env var prefix is `VIREO_`** (e.g. `VIREO_ANTHROPIC_API_KEY`). Missing the key → fail-fast at
   startup with `ConfigurationError`. The console.anthropic.com API is billed SEPARATELY from a
   Claude.ai (Max) subscription — needs its own prepaid credits.

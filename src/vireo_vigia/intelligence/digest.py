@@ -31,8 +31,8 @@ class DigestReport:
 
     wallet: str
     generated_at: float
-    period: str          # "daily" | "weekly"
-    markdown: str        # formatted for Discord/Telegram
+    period: str  # "daily" | "weekly"
+    markdown: str  # formatted for Discord/Telegram
     positions_count: int
     total_pnl: float
     max_risk_asset: str
@@ -83,9 +83,13 @@ class PortfolioDigest:
         if positions:
             riskiest = min(
                 positions,
-                key=lambda p: float(p.get("health_factor", 999))
-                if "health_factor" in p
-                else abs(float(p.get("liquidation_price") or 0) - float(p.get("mark_price") or 1)),
+                key=lambda p: (
+                    float(p.get("health_factor", 999))
+                    if "health_factor" in p
+                    else abs(
+                        float(p.get("liquidation_price") or 0) - float(p.get("mark_price") or 1)
+                    )
+                ),
             )
             max_risk = str(riskiest.get("asset", riskiest.get("coin", "unknown")))
 

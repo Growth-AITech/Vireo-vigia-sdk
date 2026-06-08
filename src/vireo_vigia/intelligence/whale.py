@@ -33,9 +33,9 @@ class WhaleAlert:
 
     wallet: str
     asset: str
-    action: str          # "opened_long", "opened_short", "closed", "deposited", "withdrew"
+    action: str  # "opened_long", "opened_short", "closed", "deposited", "withdrew"
     size_usd: float
-    protocol: str        # "Hyperliquid", "Aave", "GMX"
+    protocol: str  # "Hyperliquid", "Aave", "GMX"
     timestamp: float = field(default_factory=time.time)
     raw_position: dict[str, Any] = field(default_factory=dict)
     ai_summary: str = ""  # populated by Claude if llm is provided

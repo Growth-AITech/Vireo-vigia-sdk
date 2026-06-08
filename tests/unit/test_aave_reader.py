@@ -44,14 +44,14 @@ class TestRayToApy:
         assert _ray_to_apy(0) == pytest.approx(0.0)
 
     def test_typical_supply_rate(self) -> None:
-        # ~3% APY ≈ liquidityRate ~9.5e23 RAY per-second
-        rate = int(0.03 / (365 * 24 * 3600) * _RAY)
+        # Aave rates are an annual APR scaled by RAY. 3% APR → ~3.05% APY.
+        rate = int(0.03 * _RAY)
         apy = _ray_to_apy(rate)
         assert 0.025 < apy < 0.035
 
     def test_high_borrow_rate(self) -> None:
-        # ~20% APY
-        rate = int(0.20 / (365 * 24 * 3600) * _RAY)
+        # 20% APR → ~22.1% APY (continuous-ish compounding).
+        rate = int(0.20 * _RAY)
         apy = _ray_to_apy(rate)
         assert 0.18 < apy < 0.23
 
@@ -94,6 +94,153 @@ class TestGetUserBalance:
         with patch.object(reader, "_get_w3", return_value=w3):
             with pytest.raises(ChainConnectionError):
                 await reader.get_user_balance("0xabc")
+
+
+class TestGetUserPositions:
+    """Positions now come from AaveProtocolDataProvider (real token units)."""
+
+    @staticmethod
+    def _reader_with_mocks(reader: AaveV3Reader) -> tuple:
+        # USDC supplied as collateral, WBTC borrowed (variable).
+        tokens = [("USDC", "0xUSDC"), ("WBTC", "0xWBTC")]
+        user_data = {
+            # currentATokenBalance, stableDebt, currentVariableDebt, ..., liquidityRate(6), _, collateral(8)
+            "0xUSDC": (1000 * 10**6, 0, 0, 0, 0, 0, int(0.024 * _RAY), 0, True),
+            "0xWBTC": (0, 0, 50_000_000, 0, 0, 0, int(0.01 * _RAY), 0, False),
+        }
+        # getReserveData — only index 6 (variableBorrowRate) is read.
+        reserve_data = {"0xWBTC": (0, 0, 0, 0, 0, 0, int(0.0098 * _RAY), 0, 0, 0, 0, 0)}
+        prices = {
+            "0xUSDC": int(1.0 * _BASE_CURRENCY_UNIT),
+            "0xWBTC": int(60_000 * _BASE_CURRENCY_UNIT),
+        }
+        decimals = {"0xusdc": 6, "0xwbtc": 8}
+
+        pdp = MagicMock()
+        pdp.functions.getAllReservesTokens.return_value.call = AsyncMock(return_value=tokens)
+        pdp.functions.getUserReserveData.side_effect = lambda asset, _user: MagicMock(
+            call=AsyncMock(return_value=user_data[asset])
+        )
+        pdp.functions.getReserveData.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=reserve_data[asset])
+        )
+
+        oracle = MagicMock()
+        oracle.functions.getAssetPrice.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=prices[asset])
+        )
+        w3 = MagicMock()
+        w3.to_checksum_address = lambda x: x
+        w3.eth.contract.return_value = oracle
+        return w3, pdp, decimals
+
+    async def test_parses_supply_and_borrow(self) -> None:
+        reader = AaveV3Reader()
+        w3, pdp, decimals = self._reader_with_mocks(reader)
+
+        with (
+            patch.object(reader, "_get_w3", return_value=w3),
+            patch.object(reader, "_pdp_contract", AsyncMock(return_value=pdp)),
+            patch.object(reader, "_decimals", AsyncMock(side_effect=lambda a: decimals[a.lower()])),
+        ):
+            positions = await reader.get_user_positions("0xUSER")
+
+        assert len(positions) == 2
+        supply = next(p for p in positions if p["position_type"] == "supply")
+        borrow = next(p for p in positions if p["position_type"] == "borrow")
+        assert supply["asset_symbol"] == "USDC"
+        assert supply["balance_usd"] == pytest.approx(1000.0)
+        assert supply["is_collateral"] is True
+        assert borrow["asset_symbol"] == "WBTC"
+        assert borrow["balance_usd"] == pytest.approx(30_000.0)  # 0.5 WBTC @ $60k
+
+    async def test_rpc_failure_degrades_to_empty(self) -> None:
+        reader = AaveV3Reader()
+        w3 = MagicMock()
+        w3.to_checksum_address = lambda x: x
+
+        with (
+            patch.object(reader, "_get_w3", return_value=w3),
+            patch.object(
+                reader,
+                "_pdp_contract",
+                AsyncMock(side_effect=Exception("rpc down")),
+            ),
+        ):
+            assert await reader.get_user_positions("0xUSER") == []
+
+
+class TestGetMarketInfo:
+    """Market data now comes from AaveProtocolDataProvider."""
+
+    async def test_returns_market_fields(self) -> None:
+        reader = AaveV3Reader()
+        tokens = [("USDC", "0xUSDC")]
+        # getReserveData: [unbacked, accruedToTreasury, totalAToken, totalStableDebt,
+        #   totalVariableDebt, liquidityRate, variableBorrowRate, stableBorrowRate, ...]
+        reserve_data = (
+            0,
+            0,
+            1_000_000 * 10**6,  # totalAToken (1M USDC supplied)
+            0,  # totalStableDebt
+            800_000 * 10**6,  # totalVariableDebt
+            int(0.024 * _RAY),  # liquidityRate
+            int(0.083 * _RAY),  # variableBorrowRate
+            0,  # stableBorrowRate
+            0,
+            0,
+            0,
+            0,
+        )
+        # getReserveConfigurationData: [decimals, ltv, liqThreshold, ...]
+        cfg = (6, 7700, 8000, 10500, 1000, True, True, False, True, False)
+
+        pdp = MagicMock()
+        pdp.functions.getAllReservesTokens.return_value.call = AsyncMock(return_value=tokens)
+        pdp.functions.getReserveData.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=reserve_data)
+        )
+        pdp.functions.getReserveConfigurationData.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=cfg)
+        )
+        oracle = MagicMock()
+        oracle.functions.getAssetPrice.side_effect = lambda asset: MagicMock(
+            call=AsyncMock(return_value=int(1.0 * _BASE_CURRENCY_UNIT))
+        )
+        w3 = MagicMock()
+        w3.to_checksum_address = lambda x: x
+        w3.eth.contract.return_value = oracle
+
+        with (
+            patch.object(reader, "_get_w3", return_value=w3),
+            patch.object(reader, "_pdp_contract", AsyncMock(return_value=pdp)),
+            patch.object(reader, "_decimals", AsyncMock(return_value=6)),
+        ):
+            market = await reader.get_market_info("usdc")
+
+        assert market["asset_symbol"] == "USDC"
+        assert market["ltv"] == pytest.approx(0.77)
+        assert market["liquidation_threshold"] == pytest.approx(0.80)
+        assert 0.02 < market["variable_borrow_apy"] < 0.10
+        assert market["utilization_rate"] == pytest.approx(0.8, abs=0.01)
+
+    async def test_unknown_asset_raises(self) -> None:
+        from vireo_vigia.exceptions import ChainDataError
+
+        reader = AaveV3Reader()
+        pdp = MagicMock()
+        pdp.functions.getAllReservesTokens.return_value.call = AsyncMock(
+            return_value=[("USDC", "0xUSDC")]
+        )
+        w3 = MagicMock()
+        w3.to_checksum_address = lambda x: x
+
+        with (
+            patch.object(reader, "_get_w3", return_value=w3),
+            patch.object(reader, "_pdp_contract", AsyncMock(return_value=pdp)),
+        ):
+            with pytest.raises(ChainDataError):
+                await reader.get_market_info("DOGE")
 
 
 class TestGetRecentTrades:

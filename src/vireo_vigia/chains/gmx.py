@@ -83,6 +83,7 @@ class GMXReader:
                 ) from exc
             except (httpx.TimeoutException, httpx.ConnectError) as exc:
                 import asyncio
+
                 last_exc = exc
                 await asyncio.sleep(2**attempt)
         raise ChainConnectionError(
@@ -128,16 +129,18 @@ class GMXReader:
                 else 0.0
             )
 
-            positions.append({
-                "asset": symbol,
-                "size_usd": size_usd,
-                "entry_price": entry_price,
-                "mark_price": mark_price,
-                "unrealized_pnl": pnl,
-                "is_long": is_long,
-                "leverage": round(leverage, 2),
-                "collateral_usd": collateral,
-            })
+            positions.append(
+                {
+                    "asset": symbol,
+                    "size_usd": size_usd,
+                    "entry_price": entry_price,
+                    "mark_price": mark_price,
+                    "unrealized_pnl": pnl,
+                    "is_long": is_long,
+                    "leverage": round(leverage, 2),
+                    "collateral_usd": collateral,
+                }
+            )
 
         _log.debug("gmx_positions_fetched", wallet=wallet[:10], count=len(positions))
         return positions
@@ -169,9 +172,7 @@ class GMXReader:
             "free_margin": max(0.0, total_collateral + total_pnl),
         }
 
-    async def get_recent_trades(
-        self, wallet: str, limit: int = 50
-    ) -> list[dict[str, Any]]:
+    async def get_recent_trades(self, wallet: str, limit: int = 50) -> list[dict[str, Any]]:
         """Return recent GMX trades for a wallet (best-effort via stats API)."""
         try:
             data = await self._get("/trades", params={"account": wallet, "pageSize": str(limit)})

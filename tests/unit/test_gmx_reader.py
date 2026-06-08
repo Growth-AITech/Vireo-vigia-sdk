@@ -60,8 +60,16 @@ class TestGetUserPositions:
         assert positions[0]["is_long"] is True
 
     async def test_filters_zero_size(self, gmx_api: respx.MockRouter) -> None:  # type: ignore[type-arg]
-        tiny = [{"market": "ETH/USD", "sizeInUsd": "0", "collateralAmount": "0",
-                 "entryPrice": "0", "markPrice": "0", "isLong": True}]
+        tiny = [
+            {
+                "market": "ETH/USD",
+                "sizeInUsd": "0",
+                "collateralAmount": "0",
+                "entryPrice": "0",
+                "markPrice": "0",
+                "isLong": True,
+            }
+        ]
         gmx_api.get("/positions").mock(return_value=httpx.Response(200, json=tiny))
         reader = GMXReader()
         positions = await reader.get_user_positions(_WALLET)
@@ -103,5 +111,6 @@ class TestGetMarketInfo:
 class TestGMXReaderProtocol:
     def test_implements_onchain_reader(self) -> None:
         from vireo_vigia.chains.base import OnchainReader
+
         reader = GMXReader()
         assert isinstance(reader, OnchainReader)

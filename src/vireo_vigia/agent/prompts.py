@@ -8,6 +8,7 @@ Only the static section is eligible for Anthropic prompt caching.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from vireo_vigia.agent.models import AgentConfig
@@ -30,6 +31,9 @@ Be direct. Lead with the most important number. Use markdown for structure.
 
 _CHAIN_SECTION_TEMPLATE = """\
 ## Live account state
+The following are the connected user's real, live on-chain positions, already
+fetched for you this turn. Treat them as the user's own holdings and cite these
+exact figures — never ask the user for their wallet address.
 {content}
 """
 
@@ -87,17 +91,103 @@ def format_chain_context(
     """
     Format raw on-chain data dicts into a human-readable markdown block.
 
-    Designed to accept the output of ``OnchainReader.get_user_balance()``
-    and ``OnchainReader.get_user_positions()``.  Keys are protocol-agnostic
-    so this works across different ``OnchainReader`` implementations.
+    Accepts the output of ``OnchainReader.get_user_balance()`` and
+    ``OnchainReader.get_user_positions()`` from any reader. Two schemas are
+    supported and auto-detected:
+
+    * **Lending** (Aave V3): ``health_factor`` / ``total_collateral_usd`` and
+      positions with ``asset_symbol`` / ``position_type``.
+    * **Perp** (Hyperliquid): ``account_value`` and positions with ``coin`` /
+      ``szi`` / ``unrealizedPnl``.
 
     Args:
-        balance: Balance summary dict (e.g. ``{"account_value": "48000"}``).
-        positions: List of position dicts.
+        balance: Balance summary dict from the reader.
+        positions: List of position dicts from the reader.
 
     Returns:
         Formatted markdown string.
     """
+    is_lending = any(
+        k in balance for k in ("health_factor", "total_collateral_usd", "total_debt_usd")
+    ) or any(("asset_symbol" in p or "position_type" in p) for p in positions)
+
+    if is_lending:
+        return _format_lending_context(balance, positions)
+    return _format_perp_context(balance, positions)
+
+
+def _money(value: Any) -> str:  # noqa: ANN401 — accepts float|str from reader dicts
+    """Format a USD amount, falling back to the raw value if non-numeric."""
+    try:
+        return f"${float(value):,.2f}"
+    except (TypeError, ValueError):
+        return f"${value}"
+
+
+def _format_lending_context(
+    balance: dict[str, Any],
+    positions: list[dict[str, Any]],
+) -> str:
+    """Format an Aave-style lending account (collateral, debt, health factor)."""
+    lines: list[str] = []
+
+    if "total_collateral_usd" in balance:
+        lines.append(f"- Total collateral: **{_money(balance['total_collateral_usd'])}**")
+    if "total_debt_usd" in balance:
+        lines.append(f"- Total debt: **{_money(balance['total_debt_usd'])}**")
+    if "available_borrow_usd" in balance:
+        lines.append(f"- Available to borrow: **{_money(balance['available_borrow_usd'])}**")
+
+    hf = balance.get("health_factor")
+    if hf is not None:
+        try:
+            hf_val = float(hf)
+            if hf_val < 1.0:
+                note = " — ⚠️ LIQUIDATION IMMINENT"
+            elif hf_val < 1.5:
+                note = " — ⚠️ elevated liquidation risk"
+            else:
+                note = " — healthy"
+            lines.append(f"- Health factor: **{hf_val:.2f}**{note}")
+        except (TypeError, ValueError):
+            lines.append(f"- Health factor: **{hf}**")
+
+    ltv = balance.get("current_ltv")
+    liq_thr = balance.get("liquidation_threshold")
+    if ltv is not None and liq_thr is not None:
+        with contextlib.suppress(TypeError, ValueError):
+            lines.append(
+                f"- LTV: {float(ltv) * 100:.0f}% | "
+                f"Liquidation threshold: {float(liq_thr) * 100:.0f}%"
+            )
+
+    if positions:
+        lines.append("\n**Positions:**")
+        for p in positions:
+            sym = p.get("asset_symbol", p.get("asset", "?"))
+            ptype = str(p.get("position_type", "")).upper()
+            bal = p.get("balance_usd")
+            bal_str = _money(bal) if bal is not None else "?"
+            apy = p.get("apy")
+            apy_str = ""
+            if apy is not None:
+                try:
+                    apy_str = f" (APY {float(apy) * 100:.2f}%)"
+                except (TypeError, ValueError):
+                    apy_str = ""
+            coll = " — collateral" if p.get("is_collateral") else ""
+            lines.append(f"  - {ptype} {sym}: {bal_str}{apy_str}{coll}")
+    else:
+        lines.append("\n*No open positions.*")
+
+    return "\n".join(lines)
+
+
+def _format_perp_context(
+    balance: dict[str, Any],
+    positions: list[dict[str, Any]],
+) -> str:
+    """Format a Hyperliquid-style perpetuals account (account value, PnL)."""
     lines: list[str] = []
 
     account_value = balance.get("account_value", balance.get("accountValue", "—"))

@@ -38,7 +38,9 @@ def agent(settings):
         system_instructions="Keep answers under 3 sentences.",
         max_rag_results=2,
     )
-    return Agent(llm=llm, retriever=Retriever(embeddings=embeddings, vector_store=store), config=config)
+    return Agent(
+        llm=llm, retriever=Retriever(embeddings=embeddings, vector_store=store), config=config
+    )
 
 
 @pytest.mark.e2e
@@ -99,8 +101,12 @@ class TestDiscordCommandLogic:
         config = AgentConfig(name="Bot", protocol_name="Hyperliquid", max_rag_results=1)
 
         # Simulate two different users with separate agent instances
-        agent_user1 = Agent(llm=llm, retriever=Retriever(embeddings=embeddings, vector_store=store), config=config)
-        agent_user2 = Agent(llm=llm, retriever=Retriever(embeddings=embeddings, vector_store=store), config=config)
+        agent_user1 = Agent(
+            llm=llm, retriever=Retriever(embeddings=embeddings, vector_store=store), config=config
+        )
+        agent_user2 = Agent(
+            llm=llm, retriever=Retriever(embeddings=embeddings, vector_store=store), config=config
+        )
 
         await agent_user1.chat("I have a BTC long position.")
         await agent_user2.chat("I prefer ETH.")
@@ -109,7 +115,10 @@ class TestDiscordCommandLogic:
         assert agent_user1._memory.turn_count == 1
         assert agent_user2._memory.turn_count == 1
         # User1's memory doesn't contaminate user2's
-        assert agent_user1._memory.get_messages()[0].content != agent_user2._memory.get_messages()[0].content
+        assert (
+            agent_user1._memory.get_messages()[0].content
+            != agent_user2._memory.get_messages()[0].content
+        )
 
 
 @pytest.mark.e2e

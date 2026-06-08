@@ -1,9 +1,14 @@
 [project]
 name = "vireo-vigia"
-version = "0.1.0"
+version = "0.1.1"
 description = "Open-source Python SDK for deploying AI agents with on-chain DeFi context"
 readme = "README.md"
 license = { text = "MIT" }
+authors = [
+    { name = "Vireo" },
+    { name = "David Olarte" },
+    { name = "Mael de la Hoz" },
+]
 requires-python = ">=3.12"
 keywords = ["ai", "defi", "hyperliquid", "rag", "llm", "agent"]
 classifiers = [
@@ -29,6 +34,11 @@ dependencies = [
     "rich>=13.9.0",
     "discord-py>=2.3.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Growth-AITech/Vireo-vigia-sdk"
+Repository = "https://github.com/Growth-AITech/Vireo-vigia-sdk"
+Issues = "https://github.com/Growth-AITech/Vireo-vigia-sdk/issues"
 
 [project.optional-dependencies]
 dev = [
