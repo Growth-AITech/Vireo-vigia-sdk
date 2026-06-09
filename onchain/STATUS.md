@@ -12,9 +12,9 @@
 | Compilación (solc 0.8.28, optimizer 200) | ✅ Compila limpio |
 | Checks locales (timestamp / evento / owner-gating) | ✅ Pasan (`scripts/sanity.js`) |
 | Proyecto Hardhat (config Arbitrum One, deploy + verify) | ✅ Listo |
-| **Deploy a Arbitrum One mainnet** | ⏳ **PENDIENTE** — requiere wallet financiada |
-| Dirección del contrato | ⏳ Existe sólo tras el deploy |
-| Verificación de código en Arbiscan | ⏳ Tras el deploy (opcional) |
+| **Deploy a Arbitrum One mainnet** | ✅ **DEPLOYADO** 2026-06-08 |
+| Dirección del contrato | ✅ `0x51F04f0bE791B3373cd7B5379FeAa4605Cb058a5` |
+| Verificación de código en Arbiscan | ⏳ Opcional |
 | Wiring en el agente (`registerQuery` desde `chat()`) | ⏳ No iniciado (opcional) |
 
 ## Qué hace el contrato
@@ -40,8 +40,8 @@ npm run deploy:arbitrum               # broadcast real — gasta ~$0.10–0.50 d
 - El script imprime la dirección + link de Arbiscan. El deploy falla rápido si el balance es 0.
 - **Anotar la dirección aquí** una vez desplegado:
   ```
-  AgentRegistry (Arbitrum One): 0x________________________________________
-  Tx de deploy:                 0x________________________________________
+  AgentRegistry (Arbitrum One): 0x51F04f0bE791B3373cd7B5379FeAa4605Cb058a5
+  Tx de deploy:                 0x264c1f0f746c7f5e0a3935afac31d89227c3b9e3925fa2d9a782b06084f5e6fa
   ```
 
 ### 2. (Opcional) Verificar el código en Arbiscan
