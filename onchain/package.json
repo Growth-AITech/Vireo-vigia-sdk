@@ -1,0 +1,19 @@
+{
+  "name": "vireo-vigia-onchain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AgentRegistry contract + Hardhat deploy for Vireo Vigia (Arbitrum One)",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:arbitrum": "hardhat run scripts/deploy.js --network arbitrumOne",
+    "verify:arbitrum": "hardhat verify --network arbitrumOne"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomicfoundation/hardhat-verify": "^2.0.13",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "hardhat": "^2.22.18"
+  }
+}
